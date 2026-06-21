@@ -3,498 +3,283 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>躲避陨石</title>
-<style>
-  * {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-  }
-  body {
-    background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    color: #fff;
-    overflow: hidden;
-  }
-  h1 {
-    margin-bottom: 16px;
-    font-size: 32px;
-    text-shadow: 0 0 20px rgba(100, 200, 255, 0.8);
-    letter-spacing: 4px;
-  }
-  .info-bar {
-    display: flex;
-    gap: 40px;
-    margin-bottom: 12px;
-    font-size: 18px;
-  }
-  .info-bar span {
-    padding: 6px 16px;
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 8px;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-  }
-  .info-bar span strong {
-    color: #ffd700;
-    margin-left: 6px;
-  }
-  #gameCanvas {
-    border: 2px solid rgba(100, 200, 255, 0.5);
-    border-radius: 8px;
-    box-shadow: 0 0 40px rgba(100, 200, 255, 0.3);
-    background: #0a0a1a;
-  }
-  .controls {
-    margin-top: 16px;
-    display: flex;
-    gap: 16px;
-    flex-wrap: wrap;
-    justify-content: center;
-  }
-  button {
-    padding: 10px 24px;
-    font-size: 16px;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    background: linear-gradient(135deg, #667eea, #764ba2);
-    color: #fff;
-    font-weight: bold;
-    transition: all 0.2s;
-    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
-  }
-  button:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
-  }
-  button:active {
-    transform: translateY(0);
-  }
-  button:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-    transform: none;
-  }
-  .hint {
-    margin-top: 14px;
-    font-size: 14px;
-    color: rgba(255, 255, 255, 0.6);
-    text-align: center;
-    line-height: 1.6;
-  }
-  .overlay {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background: rgba(0, 0, 0, 0.85);
-    padding: 30px 50px;
-    border-radius: 12px;
-    text-align: center;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    display: none;
-  }
-  .overlay.active {
-    display: block;
-  }
-  .overlay h2 {
-    font-size: 28px;
-    margin-bottom: 12px;
-  }
-  .overlay p {
-    font-size: 18px;
-    margin-bottom: 20px;
-    color: #ffd700;
-  }
-  .game-container {
-    position: relative;
-  }
-</style>
+<title>太空生存 - Space Survival Roguelite</title>
+<link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <h1>🚀 躲避陨石</h1>
-  <div class="info-bar">
-    <span>当前分数:<strong id="score">0</strong></span>
-    <span>最高纪录:<strong id="highScore">0</strong></span>
-  </div>
-  <div class="game-container">
-    <canvas id="gameCanvas" width="480" height="640"></canvas>
-    <div id="overlay" class="overlay">
-      <h2 id="overlayTitle">游戏结束</h2>
-      <p id="overlayMsg">得分: 0</p>
-      <button id="overlayBtn">重新开始</button>
+
+<!-- ====== Main Menu Screen ====== -->
+<div id="mainMenu" class="screen">
+  <div class="menu-bg"></div>
+  <div class="menu-content">
+    <div class="menu-title">
+      <span class="title-icon">🚀</span>
+      <h1>太空生存</h1>
+      <p class="subtitle">SPACE SURVIVAL ROGUELITE</p>
+    </div>
+    <div class="menu-actions">
+      <button id="btnPlay" class="btn btn-primary btn-xl">
+        <span class="btn-icon">▶</span>
+        <span>开始游戏</span>
+      </button>
+      <button id="btnSettings" class="btn btn-secondary">
+        <span class="btn-icon">⚙</span>
+        <span>设置</span>
+      </button>
+      <button id="btnHelp" class="btn btn-secondary">
+        <span class="btn-icon">?</span>
+        <span>帮助</span>
+      </button>
+    </div>
+
+    <div class="menu-best">
+      <span class="best-label">最高纪录</span>
+      <span class="best-value" id="menuHighScore">0</span>
+    </div>
+
+    <div class="leaderboard-card">
+      <div class="lb-title">🏆 排行榜</div>
+      <div class="lb-list" id="menuLeaderboard"></div>
     </div>
   </div>
-  <div class="controls">
-    <button id="startBtn">开始游戏</button>
-    <button id="pauseBtn" disabled>暂停</button>
-    <button id="restartBtn">重新开始</button>
+</div>
+
+<!-- ====== Game Screen ====== -->
+<div id="gameScreen" class="screen" style="display:none;">
+  <!-- Top HUD -->
+  <div id="hud" class="hud">
+    <div class="hud-section hud-left">
+      <div class="hud-stat">
+        <span class="stat-label">得分</span>
+        <span class="stat-value" id="hudScore">0</span>
+      </div>
+      <div class="hud-stat">
+        <span class="stat-label">倍率</span>
+        <span class="stat-value accent" id="hudMultiplier">x1</span>
+      </div>
+    </div>
+    <div class="hud-section hud-center">
+      <div class="hud-stat">
+        <span class="stat-label">关卡</span>
+        <span class="stat-value wave-label" id="hudWave">第 1 关</span>
+      </div>
+      <div class="wave-bar-container">
+        <div class="wave-bar" id="waveBar"></div>
+      </div>
+    </div>
+    <div class="hud-section hud-right">
+      <div class="hud-stat">
+        <span class="stat-label">最高分</span>
+        <span class="stat-value" id="hudHighScore">0</span>
+      </div>
+      <div class="hud-stat">
+        <span class="stat-label">连击</span>
+        <span class="stat-value combo" id="hudCombo">0</span>
+      </div>
+    </div>
   </div>
-  <div class="hint">
-    ← → 方向键或 A / D 键移动飞船 &nbsp;|&nbsp; 空格键暂停 / 继续 &nbsp;|&nbsp; R 键重新开始
+
+  <!-- Canvas -->
+  <div class="canvas-wrapper" id="canvasWrapper">
+    <canvas id="gameCanvas"></canvas>
   </div>
 
-<script>
-(function() {
-  const canvas = document.getElementById('gameCanvas');
-  const ctx = canvas.getContext('2d');
-  const scoreEl = document.getElementById('score');
-  const highScoreEl = document.getElementById('highScore');
-  const startBtn = document.getElementById('startBtn');
-  const pauseBtn = document.getElementById('pauseBtn');
-  const restartBtn = document.getElementById('restartBtn');
-  const overlay = document.getElementById('overlay');
-  const overlayTitle = document.getElementById('overlayTitle');
-  const overlayMsg = document.getElementById('overlayMsg');
-  const overlayBtn = document.getElementById('overlayBtn');
+  <!-- Active Power-ups display -->
+  <div id="powerupBar" class="powerup-bar"></div>
 
-  const W = canvas.width;
-  const H = canvas.height;
+  <!-- Mobile touch controls (4-direction D-pad) -->
+  <div id="touchControls" class="touch-controls">
+    <div class="touch-dpad">
+      <button class="touch-btn touch-up" id="touchUp">▲</button>
+      <div class="dpad-middle">
+        <button class="touch-btn touch-left" id="touchLeft">◀</button>
+        <button class="touch-btn touch-right" id="touchRight">▶</button>
+      </div>
+      <button class="touch-btn touch-down" id="touchDown">▼</button>
+    </div>
+  </div>
 
-  const SHIP_W = 44;
-  const SHIP_H = 48;
-  const SHIP_Y = H - SHIP_H - 20;
-  const SHIP_SPEED = 6;
+  <!-- Bottom control bar -->
+  <div class="control-bar">
+    <button id="btnPause" class="btn btn-small">⏸ 暂停</button>
+    <button id="btnRestartGame" class="btn btn-small">↻ 重来</button>
+    <button id="btnBackToMenu" class="btn btn-small">☰ 菜单</button>
+  </div>
 
-  const HIGH_SCORE_KEY = 'meteor_dodge_high_score';
+  <div class="hint-bar">
+    ← ↑ → ↓ / WASD 移动 &nbsp;|&nbsp; 空格 暂停 &nbsp;|&nbsp; R 重来
+  </div>
+</div>
 
-  let state = 'idle';
-  let score = 0;
-  let highScore = parseInt(localStorage.getItem(HIGH_SCORE_KEY) || '0', 10);
-  highScoreEl.textContent = highScore;
+<!-- ====== Pause Overlay ====== -->
+<div id="pauseOverlay" class="overlay" style="display:none;">
+  <div class="overlay-card">
+    <h2>⏸ 已暂停</h2>
+    <p>按空格键或点击继续</p>
+    <button id="btnResume" class="btn btn-primary">继续游戏</button>
+    <button id="btnPauseRestart" class="btn btn-secondary">重新开始</button>
+  </div>
+</div>
 
-  let ship = { x: W / 2 - SHIP_W / 2, y: SHIP_Y, w: SHIP_W, h: SHIP_H };
-  let meteors = [];
-  let stars = [];
-  let keys = {};
-  let lastTime = 0;
-  let spawnTimer = 0;
-  let speedFactor = 1;
-  let elapsed = 0;
-  let rafId = null;
+<!-- ====== Game Over Overlay ====== -->
+<div id="gameOverOverlay" class="overlay" style="display:none;">
+  <div class="overlay-card gameover-card">
+    <h2 id="gameOverTitle">游戏结束</h2>
+    <div class="gameover-stats">
+      <div class="go-stat">
+        <span class="go-label">最终得分</span>
+        <span class="go-value" id="goScore">0</span>
+      </div>
+      <div class="go-stat">
+        <span class="go-label">存活时间</span>
+        <span class="go-value" id="goTime">0s</span>
+      </div>
+      <div class="go-stat">
+        <span class="go-label">击杀数</span>
+        <span class="go-value" id="goKills">0</span>
+      </div>
+      <div class="go-stat">
+        <span class="go-label">最高关卡</span>
+        <span class="go-value" id="goWave">1</span>
+      </div>
+      <div class="go-stat">
+        <span class="go-label">最大连击</span>
+        <span class="go-value" id="goCombo">0</span>
+      </div>
+      <div class="go-stat">
+        <span class="go-label">历史最高</span>
+        <span class="go-value highlight" id="goHighScore">0</span>
+      </div>
+    </div>
 
-  for (let i = 0; i < 80; i++) {
-    stars.push({
-      x: Math.random() * W,
-      y: Math.random() * H,
-      r: Math.random() * 1.5 + 0.3,
-      s: Math.random() * 1 + 0.3
-    });
-  }
+    <div class="leaderboard-card lb-gameover">
+      <div class="lb-title">🏆 排行榜</div>
+      <div class="lb-list" id="gameOverLeaderboard"></div>
+    </div>
 
-  function initStars() {
-    for (let i = 0; i < stars.length; i++) {
-      stars[i].x = Math.random() * W;
-      stars[i].y = Math.random() * H;
-    }
-  }
+    <div class="gameover-actions">
+      <button id="btnGoRestart" class="btn btn-primary btn-xl">再来一局</button>
+      <button id="btnGoMenu" class="btn btn-secondary">返回菜单</button>
+    </div>
+    <button id="btnResetHighScore" class="btn-link">清除排行榜</button>
+  </div>
+</div>
 
-  function resetGame() {
-    ship.x = W / 2 - SHIP_W / 2;
-    meteors = [];
-    score = 0;
-    spawnTimer = 0;
-    speedFactor = 1;
-    elapsed = 0;
-    scoreEl.textContent = '0';
-    initStars();
-  }
+<!-- ====== Settings Panel ====== -->
+<div id="settingsPanel" class="panel" style="display:none;">
+  <div class="panel-card">
+    <div class="panel-header">
+      <h2>⚙ 设置</h2>
+      <button id="btnCloseSettings" class="btn-close">✕</button>
+    </div>
+    <div class="settings-list">
+      <label class="setting-row">
+        <span class="setting-name">音效</span>
+        <input type="checkbox" id="settSfx" class="toggle" checked>
+      </label>
+      <div class="setting-row">
+        <span class="setting-name">音效音量</span>
+        <div class="slider-wrap">
+          <input type="range" id="settSfxVolume" min="0" max="1" step="0.05" value="0.7" class="slider">
+          <span class="slider-val">70%</span>
+        </div>
+      </div>
+      <label class="setting-row">
+        <span class="setting-name">背景音乐</span>
+        <input type="checkbox" id="settMusic" class="toggle" checked>
+      </label>
+      <div class="setting-row">
+        <span class="setting-name">音乐音量</span>
+        <div class="slider-wrap">
+          <input type="range" id="settMusicVolume" min="0" max="1" step="0.05" value="0.4" class="slider">
+          <span class="slider-val">40%</span>
+        </div>
+      </div>
+      <label class="setting-row">
+        <span class="setting-name">粒子特效</span>
+        <input type="checkbox" id="settParticles" class="toggle" checked>
+      </label>
+      <div class="setting-row">
+        <span class="setting-name">粒子密度</span>
+        <div class="slider-wrap">
+          <input type="range" id="settParticleDensity" min="0.2" max="2" step="0.1" value="1.0" class="slider">
+          <span class="slider-val">100%</span>
+        </div>
+      </div>
+      <label class="setting-row">
+        <span class="setting-name">屏幕震动</span>
+        <input type="checkbox" id="settShake" class="toggle" checked>
+      </label>
+      <label class="setting-row">
+        <span class="setting-name">飞船样式</span>
+        <select id="settShipStyle" class="setting-select">
+          <option value="classic">经典</option>
+          <option value="sleek">流线型</option>
+          <option value="angular">棱角型</option>
+        </select>
+      </label>
+    </div>
+  </div>
+</div>
 
-  function startGame() {
-    resetGame();
-    state = 'playing';
-    startBtn.disabled = true;
-    pauseBtn.disabled = false;
-    pauseBtn.textContent = '暂停';
-    hideOverlay();
-    lastTime = performance.now();
-    loop(lastTime);
-  }
+<!-- ====== Help Panel ====== -->
+<div id="helpPanel" class="panel" style="display:none;">
+  <div class="panel-card">
+    <div class="panel-header">
+      <h2>❓ 操作说明</h2>
+      <button id="btnCloseHelp" class="btn-close">✕</button>
+    </div>
+    <div class="help-content">
+      <div class="help-section">
+        <h3>操作方式</h3>
+        <div class="key-row"><kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd> 或 <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 四方向移动</div>
+        <div class="key-row">飞船会自动射击</div>
+        <div class="key-row"><kbd>空格</kbd> 暂停 / 继续</div>
+        <div class="key-row"><kbd>R</kbd> 重新开始</div>
+        <div class="key-row"><kbd>Esc</kbd> 返回菜单</div>
+        <p class="help-note">手机端可使用屏幕左下方的方向键按钮操作</p>
+      </div>
+      <div class="help-section">
+        <h3>敌人类型</h3>
+        <div class="pu-help">
+          <span class="pu-icon" style="background:rgba(255,152,0,0.2);color:#ff9800;">●</span>
+          <span><strong>小型高速陨石</strong> — 速度快，血量低，15分</span>
+        </div>
+        <div class="pu-help">
+          <span class="pu-icon" style="background:rgba(141,110,99,0.2);color:#8d6e63;">●</span>
+          <span><strong>中型分裂陨石</strong> — 血量较高，击破后分裂成4块，40分</span>
+        </div>
+        <div class="pu-help">
+          <span class="pu-icon" style="background:rgba(229,57,53,0.2);color:#e53935;">●</span>
+          <span><strong>大型Boss</strong> — 每30秒出现，发射追踪弹，500分</span>
+        </div>
+      </div>
+      <div class="help-section">
+        <h3>道具说明</h3>
+        <div class="pu-help">
+          <span class="pu-icon shield-icon">🛡</span>
+          <span><strong>护盾</strong> — 抵挡一次伤害，持续10秒</span>
+        </div>
+        <div class="pu-help">
+          <span class="pu-icon slow-icon">⏳</span>
+          <span><strong>时间减速</strong> — 敌人与子弹减速60%，持续6秒</span>
+        </div>
+        <div class="pu-help">
+          <span class="pu-icon" style="background:rgba(255,213,79,0.15);">💥</span>
+          <span><strong>散射激光</strong> — 同时发射5道激光，持续8秒</span>
+        </div>
+      </div>
+      <div class="help-section">
+        <h3>关卡机制</h3>
+        <p>每存活60秒进入下一关卡，星空背景与粒子特效随之切换。随着关卡提升，敌人刷新速度和强度逐渐增加。每击杀敌人获得分数，连续击杀5个触发连击倍率加成。</p>
+      </div>
+    </div>
+  </div>
+</div>
 
-  function pauseGame() {
-    if (state === 'playing') {
-      state = 'paused';
-      pauseBtn.textContent = '继续';
-      showOverlay('已暂停', '按空格键或点击继续', '继续');
-    } else if (state === 'paused') {
-      state = 'playing';
-      pauseBtn.textContent = '暂停';
-      hideOverlay();
-      lastTime = performance.now();
-      loop(lastTime);
-    }
-  }
+<!-- ====== Toast notifications ====== -->
+<div id="toastContainer" class="toast-container"></div>
 
-  function endGame() {
-    state = 'gameover';
-    cancelAnimationFrame(rafId);
-    startBtn.disabled = false;
-    pauseBtn.disabled = true;
-    if (score > highScore) {
-      highScore = score;
-      localStorage.setItem(HIGH_SCORE_KEY, String(highScore));
-      highScoreEl.textContent = highScore;
-      showOverlay('🎉 新纪录!', '得分: ' + score, '再来一局');
-    } else {
-      showOverlay('游戏结束', '得分: ' + score, '重新开始');
-    }
-  }
-
-  function showOverlay(title, msg, btnText) {
-    overlayTitle.textContent = title;
-    overlayMsg.textContent = msg;
-    overlayBtn.textContent = btnText;
-    overlay.classList.add('active');
-  }
-
-  function hideOverlay() {
-    overlay.classList.remove('active');
-  }
-
-  function spawnMeteor() {
-    const size = 18 + Math.random() * 32;
-    const speed = (1.5 + Math.random() * 2.5) * speedFactor;
-    meteors.push({
-      x: Math.random() * (W - size),
-      y: -size,
-      size: size,
-      speed: speed,
-      rot: Math.random() * Math.PI * 2,
-      rotSpeed: (Math.random() - 0.5) * 0.06,
-      vx: (Math.random() - 0.5) * 1.2
-    });
-  }
-
-  function rectCircleCollide(rx, ry, rw, rh, cx, cy, cr) {
-    const closestX = Math.max(rx, Math.min(cx, rx + rw));
-    const closestY = Math.max(ry, Math.min(cy, ry + rh));
-    const dx = cx - closestX;
-    const dy = cy - closestY;
-    return (dx * dx + dy * dy) < (cr * cr);
-  }
-
-  function update(dt) {
-    elapsed += dt;
-    speedFactor = 1 + elapsed / 20000;
-    score = Math.floor(elapsed / 100);
-    scoreEl.textContent = score;
-
-    if (keys['ArrowLeft'] || keys['a'] || keys['A']) {
-      ship.x -= SHIP_SPEED;
-    }
-    if (keys['ArrowRight'] || keys['d'] || keys['D']) {
-      ship.x += SHIP_SPEED;
-    }
-    ship.x = Math.max(0, Math.min(W - ship.w, ship.x));
-
-    spawnTimer += dt;
-    const spawnInterval = Math.max(280, 700 - elapsed / 30);
-    if (spawnTimer > spawnInterval) {
-      spawnTimer = 0;
-      spawnMeteor();
-    }
-
-    for (let i = meteors.length - 1; i >= 0; i--) {
-      const m = meteors[i];
-      m.y += m.speed;
-      m.x += m.vx;
-      m.rot += m.rotSpeed;
-      if (m.x < -m.size || m.x > W + m.size || m.y > H + m.size) {
-        meteors.splice(i, 1);
-        continue;
-      }
-      const cx = m.x + m.size / 2;
-      const cy = m.y + m.size / 2;
-      const cr = m.size / 2 * 0.85;
-      if (rectCircleCollide(ship.x + 6, ship.y + 6, ship.w - 12, ship.h - 12, cx, cy, cr)) {
-        endGame();
-        return;
-      }
-    }
-
-    for (let i = 0; i < stars.length; i++) {
-      const s = stars[i];
-      s.y += s.s * speedFactor;
-      if (s.y > H) {
-        s.y = 0;
-        s.x = Math.random() * W;
-      }
-    }
-  }
-
-  function drawStars() {
-    ctx.fillStyle = '#ffffff';
-    for (let i = 0; i < stars.length; i++) {
-      const s = stars[i];
-      ctx.globalAlpha = 0.4 + Math.random() * 0.4;
-      ctx.beginPath();
-      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.globalAlpha = 1;
-  }
-
-  function drawShip() {
-    const x = ship.x;
-    const y = ship.y;
-    const w = ship.w;
-    const h = ship.h;
-
-    const flameH = 14 + Math.random() * 8;
-    const grad = ctx.createLinearGradient(x + w / 2, y + h, x + w / 2, y + h + flameH);
-    grad.addColorStop(0, '#ffcc00');
-    grad.addColorStop(0.5, '#ff6600');
-    grad.addColorStop(1, 'rgba(255, 0, 0, 0)');
-    ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.moveTo(x + w * 0.3, y + h);
-    ctx.lineTo(x + w * 0.5, y + h + flameH);
-    ctx.lineTo(x + w * 0.7, y + h);
-    ctx.closePath();
-    ctx.fill();
-
-    ctx.fillStyle = '#4fc3f7';
-    ctx.beginPath();
-    ctx.moveTo(x + w / 2, y);
-    ctx.lineTo(x + w, y + h * 0.75);
-    ctx.lineTo(x + w * 0.8, y + h);
-    ctx.lineTo(x + w * 0.2, y + h);
-    ctx.lineTo(x, y + h * 0.75);
-    ctx.closePath();
-    ctx.fill();
-
-    ctx.fillStyle = '#81d4fa';
-    ctx.beginPath();
-    ctx.ellipse(x + w / 2, y + h * 0.45, w * 0.15, h * 0.2, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = '#0288d1';
-    ctx.beginPath();
-    ctx.moveTo(x, y + h * 0.75);
-    ctx.lineTo(x - w * 0.12, y + h);
-    ctx.lineTo(x + w * 0.2, y + h);
-    ctx.closePath();
-    ctx.fill();
-    ctx.beginPath();
-    ctx.moveTo(x + w, y + h * 0.75);
-    ctx.lineTo(x + w + w * 0.12, y + h);
-    ctx.lineTo(x + w * 0.8, y + h);
-    ctx.closePath();
-    ctx.fill();
-  }
-
-  function drawMeteor(m) {
-    ctx.save();
-    ctx.translate(m.x + m.size / 2, m.y + m.size / 2);
-    ctx.rotate(m.rot);
-    const grad = ctx.createRadialGradient(-m.size * 0.2, -m.size * 0.2, m.size * 0.1, 0, 0, m.size / 2);
-    grad.addColorStop(0, '#a67c52');
-    grad.addColorStop(0.5, '#795548');
-    grad.addColorStop(1, '#3e2723');
-    ctx.fillStyle = grad;
-    ctx.beginPath();
-    const n = 8;
-    for (let i = 0; i < n; i++) {
-      const a = (i / n) * Math.PI * 2;
-      const r = m.size / 2 * (0.75 + Math.sin(i * 2.3) * 0.25);
-      const px = Math.cos(a) * r;
-      const py = Math.sin(a) * r;
-      if (i === 0) ctx.moveTo(px, py);
-      else ctx.lineTo(px, py);
-    }
-    ctx.closePath();
-    ctx.fill();
-
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
-    ctx.beginPath();
-    ctx.arc(-m.size * 0.15, m.size * 0.1, m.size * 0.12, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(m.size * 0.18, -m.size * 0.12, m.size * 0.08, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-  }
-
-  function draw() {
-    ctx.fillStyle = '#0a0a1a';
-    ctx.fillRect(0, 0, W, H);
-    drawStars();
-    for (let i = 0; i < meteors.length; i++) {
-      drawMeteor(meteors[i]);
-    }
-    drawShip();
-  }
-
-  function loop(now) {
-    if (state !== 'playing') return;
-    const dt = Math.min(50, now - lastTime);
-    lastTime = now;
-    update(dt);
-    if (state === 'playing') {
-      draw();
-      rafId = requestAnimationFrame(loop);
-    }
-  }
-
-  function drawIdle() {
-    ctx.fillStyle = '#0a0a1a';
-    ctx.fillRect(0, 0, W, H);
-    drawStars();
-    ctx.save();
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
-    ctx.font = 'bold 28px "Segoe UI", sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('点击"开始游戏"', W / 2, H / 2 - 10);
-    ctx.font = '16px "Segoe UI", sans-serif';
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-    ctx.fillText('或按回车键开始', W / 2, H / 2 + 24);
-    ctx.restore();
-  }
-  drawIdle();
-
-  document.addEventListener('keydown', function(e) {
-    keys[e.key] = true;
-    if (e.key === ' ' || e.code === 'Space') {
-      e.preventDefault();
-      if (state === 'playing' || state === 'paused') {
-        pauseGame();
-      }
-    }
-    if (e.key === 'r' || e.key === 'R') {
-      startGame();
-    }
-    if (e.key === 'Enter') {
-      if (state === 'idle' || state === 'gameover') {
-        startGame();
-      } else if (state === 'paused') {
-        pauseGame();
-      }
-    }
-    if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', ' '].includes(e.key)) {
-      e.preventDefault();
-    }
-  });
-
-  document.addEventListener('keyup', function(e) {
-    keys[e.key] = false;
-  });
-
-  startBtn.addEventListener('click', startGame);
-  pauseBtn.addEventListener('click', pauseGame);
-  restartBtn.addEventListener('click', startGame);
-  overlayBtn.addEventListener('click', function() {
-    if (state === 'paused') {
-      pauseGame();
-    } else {
-      startGame();
-    }
-  });
-})();
-</script>
+<script type="module" src="js/main.js?v=20260621"></script>
 </body>
 </html>
