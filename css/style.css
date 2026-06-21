@@ -276,6 +276,11 @@ html, body {
   flex: 1;
   text-align: right;
 }
+.lb-combo {
+  color: var(--gold);
+  font-weight: bold;
+  margin-left: 4px;
+}
 .lb-empty {
   text-align: center;
   color: var(--text-dim);
