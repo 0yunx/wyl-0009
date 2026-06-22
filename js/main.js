@@ -11,7 +11,7 @@ import { Player }     from './player.js';
 import { SmallMeteor, MediumMeteor, Boss, BossBullet, spawnEnemy } from './enemies.js';
 import { createPlayerBullets } from './bullets.js';
 import { PowerUp, randomDrop } from './powerups.js';
-import { loadSettings, saveSettings } from './storage.js';
+import { loadSettings, saveSettings, DEFAULT_SETTINGS } from './storage.js';
 import { runCollisions }   from './collision.js';
 import { UIManager }       from './ui.js';
 import monitor             from './monitor.js';
@@ -64,6 +64,23 @@ class Game {
     this.renderer.shipStyle  = this.settings.shipStyle;
   }
 
+  _resetSettingsToDefault() {
+    const changed = JSON.stringify(this.settings) !== JSON.stringify(DEFAULT_SETTINGS);
+    if (!changed) {
+      this.ui.showToast('已是默认设置', 'gold');
+      return;
+    }
+    const ok = confirm('确定恢复所有设置为默认值？\n不会影响排行榜记录。');
+    if (!ok) return;
+    this.settings = { ...DEFAULT_SETTINGS };
+    saveSettings(this.settings);
+    this._applySettings();
+    if (this.settings.music) this.audio.startMusic(); else this.audio.stopMusic();
+    this.audio.updateMusicVolume();
+    this.ui.reflectSettingsToControls(this.settings);
+    this.ui.showToast('设置已恢复默认', 'gold');
+  }
+
   // ====== UI wiring ======
   _bindAllUI() {
     this.ui.bindButtons({
@@ -86,6 +103,7 @@ class Game {
           renderLeaderboardTo('menuLeaderboard');
         }
       },
+      onResetSettings: () => this._resetSettingsToDefault(),
     });
 
     this.ui.bindSettings(this.settings, {

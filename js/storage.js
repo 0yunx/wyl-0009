@@ -6,7 +6,7 @@ const KEYS = {
   HIGH_SCORE:  'space_survival_high_score',
 };
 
-const DEFAULT_SETTINGS = {
+export const DEFAULT_SETTINGS = {
   sfx: true,
   music: true,
   particles: true,

@@ -1,25 +1,31 @@
 // Leaderboard — scoring algorithm + storage + rendering.
 //
-// Design note on score balance (fixes "combo farming devalues leaderboard"):
-//   Real-time in-game score stays combo-driven (feels good to play).
-//   Leaderboard RANKING uses a separate `rankScore` that weights survival
-//   heavily, so surviving longer beats farming combos on weak enemies.
+// CRITICAL DESIGN CONSTRAINT (survival > everything else):
+//   Ranking uses rankScore where survival time has absolute dominance.
+//   Combo uses LOGARITHMIC scaling with a HARD CAP so even 10,000 combo
+//   cannot outrank someone who survived meaningfully longer.
 //
 // Rank score formula:
-//   survivalSec * 25   (core: this IS a survival game)
-//   + level * 200      (milestone: clearing levels matters)
-//   + kills * 15       (steady combat credit)
-//   + maxCombo * 5     (style bonus: exists but cannot dominate)
+//   survivalSec * 30         (core — this IS a survival game, 66%+ of score)
+//   + level * 200            (milestone bonus for actually clearing waves)
+//   + kills * 8              (combat credit, but kills also require survival)
+//   + min(log2(maxCombo+1) * 10, 60)
+//                            (combo style bonus:
+//                             5combo = 26pt / 20combo = 44pt / 63combo = 60pt
+//                             hard cap at 60 so combo farming can never dominate)
 
 import { getLeaderboard as rawGet, addToLeaderboard as rawAdd, clearLeaderboard as rawClear } from './storage.js';
 
-const LB_KEY = 'space_survival_leaderboard_v2';
+const LB_KEY = 'space_survival_leaderboard_v3';
+
+const COMBO_CAP = 60;
 
 export function computeRankScore(entry) {
-  const survival = (entry.time || 0) * 25;
+  const survival = (entry.time  || 0) * 30;
   const level    = (entry.level || 0) * 200;
-  const kills    = (entry.kills || 0) * 15;
-  const combo    = (entry.maxCombo || 0) * 5;
+  const kills    = (entry.kills || 0) * 8;
+  const rawCombo = Math.max(0, entry.maxCombo || 0);
+  const combo    = Math.min(Math.log2(rawCombo + 1) * 10, COMBO_CAP);
   return Math.floor(survival + level + kills + combo);
 }
 

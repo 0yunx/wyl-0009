@@ -37,6 +37,7 @@ export class UIManager {
     click('btnGoRestart',      handlers.onGoRestart);
     click('btnGoMenu',         handlers.onGoMenu);
     click('btnResetHighScore', handlers.onResetHighScore);
+    click('btnResetSettings',  handlers.onResetSettings);
   }
 
   // ====== Settings binding ======
@@ -69,6 +70,31 @@ export class UIManager {
     bindSlider('settSfxVolume',       settings.sfxVolume,       v => settingsChange.onSfxVolume?.(v));
     bindSlider('settMusicVolume',     settings.musicVolume,     v => settingsChange.onMusicVolume?.(v));
     bindSlider('settParticleDensity', settings.particleDensity, v => settingsChange.onParticleDensity?.(v));
+  }
+
+  // Re-apply settings object values to every DOM control in the panel.
+  // Used after "restore defaults" to refresh the UI without re-binding handlers.
+  reflectSettingsToControls(settings) {
+    const sfx       = this.$('settSfx');
+    const music     = this.$('settMusic');
+    const particles = this.$('settParticles');
+    const shake     = this.$('settShake');
+    const ship      = this.$('settShipStyle');
+    if (sfx)       sfx.checked       = settings.sfx;
+    if (music)     music.checked     = settings.music;
+    if (particles) particles.checked = settings.particles;
+    if (shake)     shake.checked     = settings.shake;
+    if (ship)      ship.value        = settings.shipStyle;
+
+    const reflectSlider = (id, value) => {
+      const el = this.$(id);
+      if (!el) return;
+      el.value = value;
+      this._updateSliderLabel(el);
+    };
+    reflectSlider('settSfxVolume',       settings.sfxVolume);
+    reflectSlider('settMusicVolume',     settings.musicVolume);
+    reflectSlider('settParticleDensity', settings.particleDensity);
   }
 
   _updateSliderLabel(el) {
