@@ -23,13 +23,13 @@ export class PowerUp {
   apply(player, game) {
     if (this.type === 'shield') {
       player.addShield(10000);
-      game.showToast('护盾已激活！10秒', 'green');
+      game.ui.showToast('护盾已激活！10秒', 'green');
     } else if (this.type === 'slow') {
       player.addTimeSlow(6000);
-      game.showToast('时间减速！6秒', 'green');
+      game.ui.showToast('时间减速！6秒', 'green');
     } else if (this.type === 'scatter') {
       player.addScatterLaser(8000);
-      game.showToast('散射激光！8秒', 'green');
+      game.ui.showToast('散射激光！8秒', 'green');
     }
   }
   static getColor(type) {

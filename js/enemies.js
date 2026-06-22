@@ -140,7 +140,10 @@ export class BossBullet {
     this._targetX = targetX;
     this._targetY = targetY;
     this._trackingTime = 1800;
+    this._trackingTotal = 1800;
     this._warningTime = 600;
+    this._turnRateMin = 0.012;
+    this._turnRateMax = 0.09;
     this.dead = false;
     const dx = targetX - x;
     const dy = targetY - y;
@@ -178,8 +181,10 @@ export class BossBullet {
       const d = Math.sqrt(dx * dx + dy * dy) || 1;
       const targetVx = (dx / d) * this.speed;
       const targetVy = (dy / d) * this.speed;
-      this.vx += (targetVx - this.vx) * 0.03;
-      this.vy += (targetVy - this.vy) * 0.03;
+      const progress = 1 - Math.max(0, this._trackingTime / this._trackingTotal);
+      const turnRate = this._turnRateMin + (this._turnRateMax - this._turnRateMin) * Math.pow(progress, 1.5);
+      this.vx += (targetVx - this.vx) * turnRate;
+      this.vy += (targetVy - this.vy) * turnRate;
     }
     this.x += this.vx * frameScale * slow;
     this.y += this.vy * frameScale * slow;

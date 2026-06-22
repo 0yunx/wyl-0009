@@ -48,6 +48,8 @@ class Game {
     this.gameOver = false;
     this._lastTime = 0;
     this._rafId = null;
+    this._collisionQuality = 'high';
+    this._fpsSmooth = 60;
 
     this._bindAllUI();
     this.ui.updateHighScoreDisplay();
@@ -285,6 +287,14 @@ class Game {
     this.particles.update(dt);
     this.renderer.updateStars(1.5 + this.level * 0.3, dt);
 
+    // Adaptive collision quality — degrades SAT to circles on slow devices
+    this._fpsSmooth = this._fpsSmooth * 0.9 + monitor.fps * 0.1;
+    if (this._collisionQuality === 'high' && this._fpsSmooth < 32) {
+      this._collisionQuality = 'low';
+    } else if (this._collisionQuality === 'low' && this._fpsSmooth > 48) {
+      this._collisionQuality = 'high';
+    }
+
     // Collisions — all side effects injected via callbacks
     runCollisions(
       { player: this.player, bullets: this.bullets, enemies: this.enemies,
@@ -296,7 +306,8 @@ class Game {
         onPlayerBossBulletHit: (p, b) => this._onPlayerBossBulletHit(p, b),
         onPlayerPowerupHit: (p, pu) => this._onPlayerPowerupHit(p, pu),
         onPlayerDead:       ()      => this._onGameOver(),
-      }
+      },
+      { quality: this._collisionQuality }
     );
 
     this.enemies = this.enemies.filter(e => !e.dead);
