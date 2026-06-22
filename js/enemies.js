@@ -133,11 +133,14 @@ export class BossBullet {
   constructor(x, y, targetX, targetY, level) {
     this.x = x;
     this.y = y;
+    this.originX = x;
+    this.originY = y;
     this.size = 14;
     this.speed = 2.8 + level * 0.15;
     this._targetX = targetX;
     this._targetY = targetY;
     this._trackingTime = 1800;
+    this._warningTime = 600;
     this.dead = false;
     const dx = targetX - x;
     const dy = targetY - y;
@@ -149,6 +152,23 @@ export class BossBullet {
   update(dt, game) {
     const frameScale = dt / 16.67;
     const slow = game.player && game.player.hasTimeSlow ? 0.4 : 1;
+
+    if (this._warningTime > 0) {
+      this._warningTime -= dt * slow;
+      if (game.player && !game.player.dead) {
+        const px = game.player.x + game.player.w / 2;
+        const py = game.player.y + game.player.h / 2;
+        this._targetX = px;
+        this._targetY = py;
+        const dx = px - this.x;
+        const dy = py - this.y;
+        const d = Math.sqrt(dx * dx + dy * dy) || 1;
+        this.vx = (dx / d) * this.speed;
+        this.vy = (dy / d) * this.speed;
+      }
+      return;
+    }
+
     this._trackingTime -= dt;
     if (this._trackingTime > 0 && game.player && !game.player.dead) {
       const px = game.player.x + game.player.w / 2;
@@ -167,6 +187,8 @@ export class BossBullet {
       this.dead = true;
     }
   }
+  get isWarning() { return this._warningTime > 0; }
+  get warningTarget() { return { x: this._targetX, y: this._targetY }; }
 }
 
 export function spawnEnemy(game) {

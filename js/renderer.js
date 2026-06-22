@@ -356,6 +356,40 @@ export default class Renderer {
 
   _drawBossBullet(b) {
     const { ctx } = this;
+
+    if (b.isWarning) {
+      const target = b.warningTarget;
+      const flash = Math.sin(Date.now() * 0.025) * 0.3 + 0.7;
+
+      ctx.save();
+      ctx.strokeStyle = `rgba(255, 60, 60, ${flash * 0.8})`;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([8, 6]);
+      ctx.beginPath();
+      ctx.moveTo(b.x, b.y);
+      ctx.lineTo(target.x, target.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      ctx.fillStyle = `rgba(255, 80, 80, ${flash * 0.6})`;
+      ctx.beginPath();
+      ctx.arc(target.x, target.y, 12, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = `rgba(255, 200, 200, ${flash})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(target.x, target.y, 12, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 11px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('!', target.x, target.y + 1);
+      ctx.restore();
+      return;
+    }
+
     const cx = b.x;
     const cy = b.y;
     const r = b.size / 2;

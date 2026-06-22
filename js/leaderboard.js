@@ -1,4 +1,4 @@
-// Leaderboard — scoring algorithm + storage + rendering.
+// Leaderboard — scoring algorithm + storage + rendering + data migration.
 //
 // CRITICAL DESIGN CONSTRAINT (survival > everything else):
 //   Ranking uses rankScore where survival time has absolute dominance.
@@ -6,81 +6,172 @@
 //   cannot outrank someone who survived meaningfully longer.
 //
 // Rank score formula:
-//   survivalSec * 30         (core — this IS a survival game, 66%+ of score)
+//   survivalSec * 30         (core — this IS a survival game, ~66%+ of score)
 //   + level * 200            (milestone bonus for actually clearing waves)
 //   + kills * 8              (combat credit, but kills also require survival)
 //   + min(log2(maxCombo+1) * 10, 60)
 //                            (combo style bonus:
 //                             5combo = 26pt / 20combo = 44pt / 63combo = 60pt
 //                             hard cap at 60 so combo farming can never dominate)
+//
+// Data versioning:
+//   v1 (legacy) — space_survival_leaderboard, simple entries sorted by score
+//   v2 (legacy) — space_survival_leaderboard_v2, early rankScore experiment
+//   v3 (current) — space_survival_leaderboard_v3, full entry with version field
 
-import { getLeaderboard as rawGet, addToLeaderboard as rawAdd, clearLeaderboard as rawClear } from './storage.js';
+import { getLeaderboard as rawGetV1, clearLeaderboard as rawClearV1 } from './storage.js';
 
-const LB_KEY = 'space_survival_leaderboard_v3';
-
+const LB_KEY_V3 = 'space_survival_leaderboard_v3';
+const LB_KEY_V2 = 'space_survival_leaderboard_v2';
+const CURRENT_VERSION = 3;
 const COMBO_CAP = 60;
 
+function _sanitizeNum(v, fallback = 0) {
+  const n = Number(v);
+  return (isFinite(n) && !isNaN(n)) ? n : fallback;
+}
+
+function _sanitizeEntry(entry) {
+  if (!entry || typeof entry !== 'object') return null;
+  const cleaned = {
+    score:     Math.max(0, Math.floor(_sanitizeNum(entry.score, 0))),
+    kills:     Math.max(0, Math.floor(_sanitizeNum(entry.kills, 0))),
+    level:     Math.max(1, Math.floor(_sanitizeNum(entry.level, 1))),
+    maxCombo:  Math.max(0, Math.floor(_sanitizeNum(entry.maxCombo, 0))),
+    time:      Math.max(0, Math.floor(_sanitizeNum(entry.time, 0))),
+    rankScore: Math.max(0, Math.floor(_sanitizeNum(entry.rankScore, 0))),
+    date:      entry.date || '',
+    version:   Math.max(1, Math.floor(_sanitizeNum(entry.version, 1))),
+  };
+  if (cleaned.rankScore === 0 && (cleaned.score > 0 || cleaned.time > 0)) {
+    cleaned.rankScore = computeRankScore(cleaned);
+  }
+  return cleaned;
+}
+
 export function computeRankScore(entry) {
-  const survival = (entry.time  || 0) * 30;
-  const level    = (entry.level || 0) * 200;
-  const kills    = (entry.kills || 0) * 8;
-  const rawCombo = Math.max(0, entry.maxCombo || 0);
+  const survival = Math.max(0, _sanitizeNum(entry?.time, 0)) * 30;
+  const level    = Math.max(0, _sanitizeNum(entry?.level, 0)) * 200;
+  const kills    = Math.max(0, _sanitizeNum(entry?.kills, 0)) * 8;
+  const rawCombo = Math.max(0, _sanitizeNum(entry?.maxCombo, 0));
   const combo    = Math.min(Math.log2(rawCombo + 1) * 10, COMBO_CAP);
   return Math.floor(survival + level + kills + combo);
 }
 
+function _readRaw(key) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    return Array.isArray(data) ? data : null;
+  } catch {
+    return null;
+  }
+}
+
+function _migrateV1() {
+  const v1 = rawGetV1();
+  if (!v1 || !Array.isArray(v1) || v1.length === 0) return null;
+  const migrated = v1
+    .map(e => _sanitizeEntry({ ...e, maxCombo: e.maxCombo || 0, version: 1 }))
+    .filter(e => e && e.score > 0);
+  if (migrated.length === 0) return null;
+  migrated.forEach(e => {
+    e.rankScore = computeRankScore(e);
+    e.version = CURRENT_VERSION;
+  });
+  migrated.sort((a, b) => b.rankScore - a.rankScore);
+  return migrated.slice(0, 5);
+}
+
+function _migrateV2() {
+  const v2 = _readRaw(LB_KEY_V2);
+  if (!v2 || v2.length === 0) return null;
+  const migrated = v2
+    .map(e => _sanitizeEntry({ ...e, version: 2 }))
+    .filter(e => e && (e.score > 0 || e.time > 0));
+  if (migrated.length === 0) return null;
+  migrated.forEach(e => {
+    if (!e.rankScore) e.rankScore = computeRankScore(e);
+    e.version = CURRENT_VERSION;
+  });
+  migrated.sort((a, b) => b.rankScore - a.rankScore);
+  return migrated.slice(0, 5);
+}
+
+function _tryMigrateAny() {
+  const v2 = _migrateV2();
+  if (v2 && v2.length > 0) return v2;
+  const v1 = _migrateV1();
+  if (v1 && v1.length > 0) return v1;
+  return null;
+}
+
 export function getLeaderboard() {
   try {
-    const raw = localStorage.getItem(LB_KEY);
+    const raw = localStorage.getItem(LB_KEY_V3);
     if (!raw) {
-      // Migrate from v1 storage if present
-      const v1 = rawGet();
-      if (v1 && v1.length > 0) {
-        const migrated = v1.map(e => ({ ...e, maxCombo: e.maxCombo || 0, rankScore: computeRankScore(e) }));
-        migrated.sort((a, b) => b.rankScore - a.rankScore);
-        localStorage.setItem(LB_KEY, JSON.stringify(migrated.slice(0, 5)));
-        return migrated.slice(0, 5);
+      const migrated = _tryMigrateAny();
+      if (migrated && migrated.length > 0) {
+        localStorage.setItem(LB_KEY_V3, JSON.stringify(migrated));
+        return migrated;
       }
       return [];
     }
-    return JSON.parse(raw) || [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    const cleaned = parsed.map(_sanitizeEntry).filter(e => e !== null);
+    if (cleaned.some(e => e.version !== CURRENT_VERSION)) {
+      cleaned.forEach(e => { e.version = CURRENT_VERSION; });
+      localStorage.setItem(LB_KEY_V3, JSON.stringify(cleaned));
+    }
+    return cleaned;
   } catch {
     return [];
   }
 }
 
 export function addToLeaderboard(entry) {
-  const rankScore = computeRankScore(entry);
-  const fullEntry = { ...entry, rankScore, date: new Date().toLocaleDateString() };
+  const clean = _sanitizeEntry(entry) || _sanitizeEntry({});
+  const rankScore = computeRankScore(clean);
+  const fullEntry = {
+    ...clean,
+    rankScore,
+    date: new Date().toLocaleDateString(),
+    version: CURRENT_VERSION,
+  };
   const board = getLeaderboard();
   board.push(fullEntry);
   board.sort((a, b) => b.rankScore - a.rankScore);
   const top5 = board.slice(0, 5);
-  try { localStorage.setItem(LB_KEY, JSON.stringify(top5)); } catch {}
+  try { localStorage.setItem(LB_KEY_V3, JSON.stringify(top5)); } catch {}
   return top5;
 }
 
 export function clearLeaderboard() {
-  try { localStorage.removeItem(LB_KEY); } catch {}
-  rawClear();
+  try { localStorage.removeItem(LB_KEY_V3); } catch {}
+  try { localStorage.removeItem(LB_KEY_V2); } catch {}
+  rawClearV1();
 }
 
 export function getHighScore() {
   const board = getLeaderboard();
   if (board.length === 0) return 0;
-  return board[0].score || 0;
+  return Math.max(0, _sanitizeNum(board[0].score, 0));
 }
 
 export function isNewHigh(entry, board) {
+  const cleanEntry = _sanitizeEntry(entry) || _sanitizeEntry({});
   if (!board || board.length === 0) return true;
-  const entryRank = computeRankScore(entry);
-  const topRank = board[0].rankScore || computeRankScore(board[0]);
+  const entryRank = computeRankScore(cleanEntry);
+  const topRank = _sanitizeNum(board[0]?.rankScore, 0) || computeRankScore(board[0]);
   if (entryRank > topRank) return true;
-  if (entryRank === topRank) return (entry.score || 0) > (board[0].score || 0);
+  if (entryRank === topRank) {
+    return _sanitizeNum(cleanEntry.score, 0) > _sanitizeNum(board[0]?.score, 0);
+  }
   return false;
 }
 
-// ====== Rendering ======
 export function renderLeaderboardTo(containerId) {
   const container = document.getElementById(containerId);
   if (!container) return;
@@ -102,3 +193,5 @@ export function renderLeaderboardTo(containerId) {
     `;
   }).join('');
 }
+
+export const LB_VERSION = CURRENT_VERSION;

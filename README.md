@@ -117,7 +117,7 @@ npx serve .
 ├── css/
 │   └── style.css       # 全部样式（HUD、菜单、设置、响应式）
 ├── js/
-│   ├── main.js         # 游戏主控制器（循环、碰撞、UI 绑定）
+│   ├── main.js         # 游戏主控制器（状态、循环、模块组装）
 │   ├── player.js       # 玩家飞船（移动、射击、生命值、道具状态）
 │   ├── enemies.js      # 敌人定义（小陨石、分裂陨石、Boss、追踪弹）
 │   ├── bullets.js      # 子弹定义（普通激光、散射激光）
@@ -126,7 +126,11 @@ npx serve .
 │   ├── particles.js    # 粒子系统（爆炸、拾取、特效）
 │   ├── input.js        # 输入管理（键盘 + 触屏 D-pad）
 │   ├── audio.js        # Web Audio API 音效与背景音乐
-│   └── storage.js      # localStorage 排行榜与设置持久化
+│   ├── collision.js    # SAT 碰撞检测（纯函数，回调注入副作用）
+│   ├── leaderboard.js  # 排行榜（计分算法 + 存储 + 渲染 + 版本迁移）
+│   ├── monitor.js      # 全局异常监控（错误捕获 + FPS + 日志持久化）
+│   ├── storage.js      # localStorage 原始读写（设置 + 旧版排行榜）
+│   └── ui.js           # UI 层（HUD、菜单、弹窗、Toast）
 └── README.md           # 本说明文档
 ```
 
