@@ -143,3 +143,126 @@ npx serve .
 - **JavaScript ES6+** — 模块化（`import` / `export`）、类、箭头函数
 - **Web Audio API** — 音效合成与背景音乐（无外部音频文件）
 - **localStorage** — 排行榜与玩家设置持久化
+
+---
+
+## 计分公式
+
+排行榜使用 **rankScore** 进行排序，生存时间具有绝对主导权重：
+
+```
+rankScore = survivalSec * 30      // 核心（约占总分 66%+）
+          + level * 200           // 通关里程碑奖励
+          + kills * 8             // 击杀奖励（但击杀本身依赖生存）
+          + min(log2(maxCombo+1) * 10, 60)
+                                  // 连击风格奖励，上限 60 分
+```
+
+**连击分数对照表：**
+
+| 最大连击 | 连击奖励分 |
+|---------|-----------|
+| 5 连击  | 26 分     |
+| 10 连击 | 34 分     |
+| 20 连击 | 44 分     |
+| 40 连击 | 54 分     |
+| 63+连击 | 60 分（封顶） |
+
+> 设计意图：这是一个**生存游戏**，活得久永远比刷分重要。即使刷到 10000 连击，也无法超越多存活几秒的玩家。
+
+---
+
+## collision.js 接口说明
+
+### 核心原理
+采用 **SAT（Separating Axis Theorem，分离轴定理）** 实现凸多边形精确碰撞检测，替代了原先的圆形近似，使飞船三角形轮廓与陨石不规则形状的碰撞真正匹配视觉模型。
+
+### 导出函数
+
+| 函数 | 说明 |
+|------|------|
+| `polygonHit(polyA, polyB)` | 检测两个多边形是否相交（SAT 算法） |
+| `circleHit(ax, ay, ar, bx, by, br)` | 圆形碰撞检测（保留，用于子弹/道具） |
+| `polygonCircleHit(poly, cx, cy, cr)` | 多边形与圆形的碰撞检测 |
+| `getPlayerPolygon(player)` | 根据玩家飞船状态构建碰撞多边形 |
+| `getEnemyPolygon(enemy)` | 根据敌人状态构建碰撞多边形（匹配渲染的不规则 n 边形） |
+| `getBulletPolygon(bullet)` | 根据子弹状态构建矩形碰撞多边形 |
+| `getBossBulletCircle(bullet)` | 获取 Boss 追踪弹的碰撞圆 |
+| `getPowerupCircle(powerup)` | 获取道具的碰撞圆 |
+| `runCollisions(state, callbacks)` | 执行完整碰撞检测流程，结果通过回调返回 |
+
+### runCollisions 回调
+
+```js
+runCollisions(state, {
+  onBulletEnemyHit(bullet, enemy),    // 玩家子弹命中敌人
+  onEnemyKilled(enemy),               // 敌人被击杀
+  onPlayerEnemyHit(player, enemy),    // 玩家与敌人相撞
+  onPlayerBossBulletHit(player, bullet), // 玩家被 Boss 子弹命中
+  onPlayerPowerupHit(player, powerup),   // 玩家拾取道具
+  onPlayerDead(player),               // 玩家死亡
+})
+```
+
+### 设计特点
+- **纯函数**：碰撞模块不依赖游戏状态，副作用全部通过回调注入
+- **可独立测试**：所有检测逻辑均可单独单元测试
+- **性能权衡**：子弹-敌人使用多边形精确检测，道具拾取仍用圆形（效率足够且体验一致）
+
+---
+
+## monitor.js 接口说明
+
+### 功能
+全局异常安全网 + FPS 性能监控 + 日志持久化 + 可选匿名上报。
+
+### 安装与配置
+
+```js
+import monitor from './monitor.js';
+
+monitor.install({
+  onToast: (msg, type) => { ... },  // 错误时显示 Toast
+  onError: (err, info) => { ... },  // 额外的错误回调
+  reportUrl: 'https://...',         // 可选：匿名上报端点
+  enableReport: false,              // 可选：是否启用上报（默认关闭）
+});
+```
+
+### 公开 API
+
+| 方法 / 属性 | 说明 |
+|------------|------|
+| `monitor.install(options)` | 安装全局错误监听（幂等） |
+| `monitor.safe(fn, fallback)` | 包装同步函数，出错返回 fallback |
+| `monitor.safeAsync(fn, fallback)` | 包装异步函数，出错返回 fallback |
+| `monitor.tickFrame()` | 每帧调用，用于 FPS 统计 |
+| `monitor.fps` | 当前 FPS（只读） |
+| `monitor.errorCount` | 累计错误数（只读） |
+| `monitor.getAllLogs()` | 从 localStorage 读取所有错误日志（最多 50 条） |
+| `monitor.clearLogs()` | 清空本地错误日志 |
+| `monitor.setReportUrl(url)` | 设置匿名上报端点 URL |
+| `monitor.setReportEnabled(enabled)` | 启用/禁用匿名上报 |
+| `monitor.reportEnabled` | 当前是否启用上报（只读） |
+
+### 日志条目结构
+
+```js
+{
+  t:        1719000000000,  // 时间戳
+  type:     'error',         // 错误类型：error / unhandledrejection
+  message:  '...',           // 错误消息
+  stack:    '...',           // 错误堆栈
+  file:     'player.js',     // 出错文件（如有）
+  line:     42,              // 出错行号（如有）
+  fps:      58,              // 出错时的 FPS
+  url:      '...',           // 页面 URL
+  ua:       '...',           // User-Agent
+}
+```
+
+### 匿名上报
+- 默认**关闭**，需显式调用 `setReportEnabled(true)` 开启
+- 使用 `navigator.sendBeacon` 优先发送，不阻塞页面
+- 上报内容不包含任何用户身份信息，仅错误与环境数据
+- 上报失败静默忽略，不影响游戏运行

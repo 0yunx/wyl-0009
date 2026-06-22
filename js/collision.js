@@ -1,9 +1,39 @@
 // Collision — pure collision detection, no Game dependency.
 // Uses SAT (Separating Axis Theorem) for convex polygons so ship triangle
-// outlines and meteor irregular shapes truly match their visual models.
+// outlines and meteor shapes truly match their visual models.
 //
 // All side effects (particles, audio, state changes) are injected via callbacks,
 // making this module independently testable.
+
+// ========== Convex hull (Andrew's monotone chain) ==========
+// Ensures any polygon we feed to SAT is strictly convex.
+
+function _cross(o, a, b) {
+  return (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+}
+
+function convexHull(points) {
+  if (points.length <= 1) return points.slice();
+  const sorted = points.slice().sort((a, b) => a.x === b.x ? a.y - b.y : a.x - b.x);
+  const lower = [];
+  for (const p of sorted) {
+    while (lower.length >= 2 && _cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) {
+      lower.pop();
+    }
+    lower.push(p);
+  }
+  const upper = [];
+  for (let i = sorted.length - 1; i >= 0; i--) {
+    const p = sorted[i];
+    while (upper.length >= 2 && _cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) {
+      upper.pop();
+    }
+    upper.push(p);
+  }
+  lower.pop();
+  upper.pop();
+  return lower.concat(upper);
+}
 
 // ========== SAT core ==========
 
@@ -37,6 +67,7 @@ function overlapOnAxis(polyA, polyB, axis) {
 }
 
 export function polygonHit(polyA, polyB) {
+  if (polyA.length < 3 || polyB.length < 3) return false;
   const axesA = getAxes(polyA);
   const axesB = getAxes(polyB);
   for (const axis of axesA) {
@@ -48,7 +79,7 @@ export function polygonHit(polyA, polyB) {
   return true;
 }
 
-// ========== Circle helpers (kept for bullets / powerups) ==========
+// ========== Circle helpers ==========
 
 export function circleHit(ax, ay, ar, bx, by, br) {
   const dx = ax - bx;
@@ -58,55 +89,43 @@ export function circleHit(ax, ay, ar, bx, by, br) {
 }
 
 // ========== Polygon builders ==========
+// IMPORTANT: all returned polygons are guaranteed convex via convexHull().
 
-// Player ship polygon — matches the classic triangular silhouette
-// (works for all ship styles since the outer bounds are similar)
 export function getPlayerPolygon(p) {
   const { x, y, w, h } = p;
   const cx = x + w / 2;
   const top = y;
-  const bottom = y + h;
-  const leftWing = x;
-  const rightWing = x + w;
   const midY = y + h * 0.72;
   const innerWingY = y + h;
 
-  return [
+  const raw = [
     { x: cx, y: top },
-    { x: rightWing, y: midY },
+    { x: x + w, y: midY },
     { x: x + w * 0.82, y: innerWingY },
     { x: x + w * 0.18, y: innerWingY },
-    { x: leftWing, y: midY },
+    { x: x, y: midY },
   ];
+  return convexHull(raw);
 }
 
-// Enemy meteor polygon — irregular n-gon matching render code
-// size/2 is the base radius; amplitude matches the 0.72..1.00 scale
-// in renderer.js (sin(i * 2.7 + rot) * 0.28)
 export function getEnemyPolygon(e) {
   const cx = e.x + e.size / 2;
   const cy = e.y + e.size / 2;
   const n = e.type === 'boss' ? 12 : (e.type === 'medium' ? 9 : 7);
   const rBase = e.size / 2;
   const rot = e.rot || 0;
-  const poly = [];
+  const raw = [];
   for (let i = 0; i < n; i++) {
     const a = (i / n) * Math.PI * 2;
     const r = rBase * (0.72 + Math.sin(i * 2.7 + rot) * 0.28);
-    poly.push({
+    raw.push({
       x: cx + Math.cos(a) * r,
       y: cy + Math.sin(a) * r,
     });
   }
-  return poly;
+  return convexHull(raw);
 }
 
-// Boss bullet / tracking bullet — small circle (still efficient)
-export function getBossBulletCircle(b) {
-  return { cx: b.x, cy: b.y, r: b.size * 0.4 };
-}
-
-// Player bullet — small rectangle approximated as polygon
 export function getBulletPolygon(b) {
   const hx = b.w / 2;
   const hy = b.h / 2;
@@ -120,19 +139,14 @@ export function getBulletPolygon(b) {
   ];
 }
 
-// Power-up — circle for pickups
 export function getPowerupCircle(pu) {
   return { cx: pu.x + pu.size / 2, cy: pu.y + pu.size / 2, r: pu.size * 0.45 };
 }
 
-// Circle vs polygon using SAT (treat circle as many-sided polygon for accuracy,
-// but here we use the optimized approach: closest vertex + axis to circle center)
+// Optimized circle-vs-polygon: closest point on polygon to circle center
 export function polygonCircleHit(poly, cx, cy, cr) {
-  for (const p of poly) {
-    const dx = p.x - cx;
-    const dy = p.y - cy;
-    if (dx * dx + dy * dy < cr * cr) return true;
-  }
+  if (poly.length < 3) return false;
+  let inside = true;
   for (let i = 0; i < poly.length; i++) {
     const p1 = poly[i];
     const p2 = poly[(i + 1) % poly.length];
@@ -144,7 +158,10 @@ export function polygonCircleHit(poly, cx, cy, cr) {
     const dx = cx - closestX;
     const dy = cy - closestY;
     if (dx * dx + dy * dy < cr * cr) return true;
+    const cross = (cx - p1.x) * edgeY - (cy - p1.y) * edgeX;
+    if (cross > 0) inside = false;
   }
+  if (inside) return true;
   return false;
 }
 
@@ -166,7 +183,7 @@ export function runCollisions(state, callbacks) {
 
   const playerPoly = getPlayerPolygon(player);
 
-  // 1) Player bullets vs enemies
+  // 1) Player bullets vs enemies — both polygon, SAT exact
   for (const b of bullets) {
     if (b.dead) continue;
     const bPoly = getBulletPolygon(b);
@@ -184,7 +201,7 @@ export function runCollisions(state, callbacks) {
     }
   }
 
-  // 2) Player vs enemies
+  // 2) Player vs enemies — both polygon, SAT exact
   for (const e of enemies) {
     if (e.dead || e.type === 'bossBullet') continue;
     if (e.type === 'boss' && !e.entered) continue;
@@ -195,19 +212,19 @@ export function runCollisions(state, callbacks) {
     }
   }
 
-  // 3) Player vs boss bullets (skip warning phase)
+  // 3) Player vs boss bullets — polygon vs circle (skip warning phase)
   for (const b of bossBullets) {
     if (b.dead) continue;
     if (b.isWarning) continue;
-    const bc = getBossBulletCircle(b);
-    if (polygonCircleHit(playerPoly, bc.cx, bc.cy, bc.r)) {
+    const r = b.size * 0.4;
+    if (polygonCircleHit(playerPoly, b.x, b.y, r)) {
       b.dead = true;
       callbacks.onPlayerBossBulletHit?.(player, b);
       break;
     }
   }
 
-  // 4) Player vs power-ups
+  // 4) Player vs power-ups — circle vs circle (both are round visually)
   const pcx = player.x + player.w / 2;
   const pcy = player.y + player.h / 2;
   const pr  = Math.min(player.w, player.h) * 0.4;

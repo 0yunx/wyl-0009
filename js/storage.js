@@ -1,9 +1,11 @@
-// Storage — localStorage wrapper for leaderboard and settings
+// Storage — localStorage wrapper for settings ONLY.
+//
+// Leaderboard has its own module (leaderboard.js) with versioning and
+// migration logic. This module must NOT write any leaderboard keys —
+// doing so would create duplicate / inconsistent data.
 
 const KEYS = {
-  LEADERBOARD: 'space_survival_leaderboard',
-  SETTINGS:    'space_survival_settings',
-  HIGH_SCORE:  'space_survival_high_score',
+  SETTINGS: 'space_survival_settings',
 };
 
 export const DEFAULT_SETTINGS = {
@@ -17,36 +19,31 @@ export const DEFAULT_SETTINGS = {
   particleDensity: 1.0,
 };
 
-export function getLeaderboard() {
+// Migrate old settings keys if present (one-time)
+function _maybeMigrateSettings() {
   try {
-    const raw = localStorage.getItem(KEYS.LEADERBOARD);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-}
-
-export function addToLeaderboard(entry) {
-  const board = getLeaderboard();
-  board.push(entry);
-  board.sort((a, b) => b.score - a.score);
-  const top5 = board.slice(0, 5);
-  localStorage.setItem(KEYS.LEADERBOARD, JSON.stringify(top5));
-  return top5;
-}
-
-export function clearLeaderboard() {
-  localStorage.removeItem(KEYS.LEADERBOARD);
-}
-
-export function getHighScore() {
-  const board = getLeaderboard();
-  if (board.length > 0) return board[0].score;
-  return 0;
+    const raw = localStorage.getItem(KEYS.SETTINGS);
+    if (raw) return;
+    const legacy = {};
+    const legacyKeys = ['sfx', 'music', 'particles', 'shake', 'shipStyle', 'sfxVolume', 'musicVolume', 'particleDensity'];
+    let foundAny = false;
+    for (const k of legacyKeys) {
+      const v = localStorage.getItem(`space_survival_${k}`);
+      if (v !== null) {
+        try { legacy[k] = JSON.parse(v); } catch { legacy[k] = v; }
+        foundAny = true;
+      }
+    }
+    if (foundAny) {
+      const merged = { ...DEFAULT_SETTINGS, ...legacy };
+      localStorage.setItem(KEYS.SETTINGS, JSON.stringify(merged));
+    }
+  } catch {}
 }
 
 export function loadSettings() {
   try {
+    _maybeMigrateSettings();
     const raw = localStorage.getItem(KEYS.SETTINGS);
     return raw ? { ...DEFAULT_SETTINGS, ...JSON.parse(raw) } : { ...DEFAULT_SETTINGS };
   } catch {
@@ -55,5 +52,7 @@ export function loadSettings() {
 }
 
 export function saveSettings(settings) {
-  localStorage.setItem(KEYS.SETTINGS, JSON.stringify(settings));
+  try {
+    localStorage.setItem(KEYS.SETTINGS, JSON.stringify(settings));
+  } catch {}
 }

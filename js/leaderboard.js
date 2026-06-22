@@ -19,7 +19,9 @@
 //   v2 (legacy) — space_survival_leaderboard_v2, early rankScore experiment
 //   v3 (current) — space_survival_leaderboard_v3, full entry with version field
 
-import { getLeaderboard as rawGetV1, clearLeaderboard as rawClearV1 } from './storage.js';
+// Leaderboard is fully self-contained — does NOT depend on storage.js for
+// any leaderboard reads/writes. storage.js only handles settings now.
+const LB_KEY_V1 = 'space_survival_leaderboard';
 
 const LB_KEY_V3 = 'space_survival_leaderboard_v3';
 const LB_KEY_V2 = 'space_survival_leaderboard_v2';
@@ -70,7 +72,11 @@ function _readRaw(key) {
 }
 
 function _migrateV1() {
-  const v1 = rawGetV1();
+  let v1 = null;
+  try {
+    const raw = localStorage.getItem(LB_KEY_V1);
+    if (raw) v1 = JSON.parse(raw);
+  } catch { v1 = null; }
   if (!v1 || !Array.isArray(v1) || v1.length === 0) return null;
   const migrated = v1
     .map(e => _sanitizeEntry({ ...e, maxCombo: e.maxCombo || 0, version: 1 }))
@@ -151,7 +157,7 @@ export function addToLeaderboard(entry) {
 export function clearLeaderboard() {
   try { localStorage.removeItem(LB_KEY_V3); } catch {}
   try { localStorage.removeItem(LB_KEY_V2); } catch {}
-  rawClearV1();
+  try { localStorage.removeItem(LB_KEY_V1); } catch {}
 }
 
 export function getHighScore() {
