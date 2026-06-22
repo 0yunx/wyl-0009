@@ -87,6 +87,12 @@
   <!-- Active Power-ups display -->
   <div id="powerupBar" class="powerup-bar"></div>
 
+  <!-- Collision degradation indicator -->
+  <div id="collisionDegradation" class="collision-degradation" style="display:none;">
+    <span class="degradation-icon">⚠</span>
+    <span class="degradation-text">碰撞精度降级</span>
+  </div>
+
   <!-- Mobile touch controls (4-direction D-pad) -->
   <div id="touchControls" class="touch-controls">
     <div class="touch-dpad">
@@ -216,6 +222,14 @@
           <option value="classic">经典</option>
           <option value="sleek">流线型</option>
           <option value="angular">棱角型</option>
+        </select>
+      </label>
+      <label class="setting-row">
+        <span class="setting-name">碰撞质量</span>
+        <select id="settCollisionQuality" class="setting-select">
+          <option value="high">高精度SAT</option>
+          <option value="auto">自动适配</option>
+          <option value="low">仅圆形</option>
         </select>
       </label>
       <div class="settings-actions">

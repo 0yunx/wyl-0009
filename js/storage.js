@@ -17,6 +17,7 @@ export const DEFAULT_SETTINGS = {
   sfxVolume: 0.7,
   musicVolume: 0.4,
   particleDensity: 1.0,
+  collisionQuality: 'auto',
 };
 
 // Migrate old settings keys if present (one-time)

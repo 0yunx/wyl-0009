@@ -49,7 +49,10 @@ class Game {
     this._lastTime = 0;
     this._rafId = null;
     this._collisionQuality = 'high';
+    this._collisionDegraded = false;
     this._fpsSmooth = 60;
+    this._pauseRafId = null;
+    this._pauseLastTime = 0;
 
     this._bindAllUI();
     this.ui.updateHighScoreDisplay();
@@ -133,6 +136,10 @@ class Game {
         if (this.settings.particles) this.particles.setDensity(v);
         saveSettings(this.settings);
       },
+      onCollisionQuality: v => {
+        this.settings.collisionQuality = v;
+        saveSettings(this.settings);
+      },
     });
   }
 
@@ -181,6 +188,8 @@ class Game {
   stop() {
     this.running = false;
     if (this._rafId) cancelAnimationFrame(this._rafId);
+    if (this._pauseRafId) cancelAnimationFrame(this._pauseRafId);
+    this._pauseRafId = null;
     this.audio.stopMusic();
   }
 
@@ -196,11 +205,24 @@ class Game {
     this.paused = !this.paused;
     if (this.paused) {
       this.ui.showOverlay('pauseOverlay');
+      this._pauseLastTime = performance.now();
+      this._pauseLoop(this._pauseLastTime);
     } else {
+      if (this._pauseRafId) cancelAnimationFrame(this._pauseRafId);
+      this._pauseRafId = null;
       this.ui.hideOverlay('pauseOverlay');
       this._lastTime = performance.now();
       this._loop(this._lastTime);
     }
+  }
+
+  _pauseLoop(now) {
+    if (!this.paused) return;
+    const dt = Math.min(50, now - this._pauseLastTime);
+    this._pauseLastTime = now;
+    this.renderer.updateStars(1.5 + this.level * 0.3, dt);
+    this.renderer.render({ ship: this.player, enemies: this.enemies, bullets: this.bullets, bossBullets: this.bossBullets, powerUps: this.powerUps });
+    this._pauseRafId = requestAnimationFrame(t => this._pauseLoop(t));
   }
 
   // ====== Loop ======
@@ -289,10 +311,20 @@ class Game {
 
     // Adaptive collision quality — degrades SAT to circles on slow devices
     this._fpsSmooth = this._fpsSmooth * 0.9 + monitor.fps * 0.1;
-    if (this._collisionQuality === 'high' && this._fpsSmooth < 32) {
-      this._collisionQuality = 'low';
-    } else if (this._collisionQuality === 'low' && this._fpsSmooth > 48) {
-      this._collisionQuality = 'high';
+    const qualitySetting = this.settings.collisionQuality || 'auto';
+    if (qualitySetting === 'auto') {
+      if (this._collisionQuality === 'high' && this._fpsSmooth < 32) {
+        this._collisionQuality = 'low';
+      } else if (this._collisionQuality === 'low' && this._fpsSmooth > 48) {
+        this._collisionQuality = 'high';
+      }
+    } else {
+      this._collisionQuality = qualitySetting;
+    }
+    const wasDegraded = this._collisionDegraded;
+    this._collisionDegraded = this._collisionQuality === 'low';
+    if (this._collisionDegraded !== wasDegraded) {
+      this.ui.setCollisionDegradation(this._collisionDegraded);
     }
 
     // Collisions — all side effects injected via callbacks

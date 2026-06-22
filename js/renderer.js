@@ -386,6 +386,15 @@ export default class Renderer {
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText('!', target.x, target.y + 1);
+
+      ctx.fillStyle = `rgba(255, 80, 80, ${flash})`;
+      ctx.font = 'bold 10px sans-serif';
+      ctx.fillText('即将命中', target.x, target.y + 22);
+      const countdown = Math.max(0, b._warningTime / 1000).toFixed(1);
+      ctx.font = '9px sans-serif';
+      ctx.fillStyle = `rgba(255, 200, 200, ${flash})`;
+      ctx.fillText(countdown + 's', target.x, target.y + 34);
+
       ctx.restore();
       return;
     }

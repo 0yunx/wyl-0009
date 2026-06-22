@@ -42,19 +42,22 @@ export class UIManager {
 
   // ====== Settings binding ======
   // settingsChange = { onSfx(v), onMusic(v), onParticles(v), onShake(v), onShip(v),
-  //                    onSfxVolume(v), onMusicVolume(v), onParticleDensity(v) }
+  //                    onSfxVolume(v), onMusicVolume(v), onParticleDensity(v),
+  //                    onCollisionQuality(v) }
   bindSettings(settings, settingsChange) {
     const sfx        = this.$('settSfx');
     const music      = this.$('settMusic');
     const particles  = this.$('settParticles');
     const shake      = this.$('settShake');
     const ship       = this.$('settShipStyle');
+    const collQual   = this.$('settCollisionQuality');
 
     if (sfx)       { sfx.checked       = settings.sfx;       sfx.onchange       = () => settingsChange.onSfx?.(sfx.checked); }
     if (music)     { music.checked     = settings.music;     music.onchange     = () => settingsChange.onMusic?.(music.checked); }
     if (particles) { particles.checked = settings.particles; particles.onchange = () => settingsChange.onParticles?.(particles.checked); }
     if (shake)     { shake.checked     = settings.shake;     shake.onchange     = () => settingsChange.onShake?.(shake.checked); }
     if (ship)      { ship.value        = settings.shipStyle; ship.onchange      = () => settingsChange.onShip?.(ship.value); }
+    if (collQual)  { collQual.value    = settings.collisionQuality || 'auto'; collQual.onchange = () => settingsChange.onCollisionQuality?.(collQual.value); }
 
     const bindSlider = (id, value, onChange) => {
       const el = this.$(id);
@@ -80,11 +83,13 @@ export class UIManager {
     const particles = this.$('settParticles');
     const shake     = this.$('settShake');
     const ship      = this.$('settShipStyle');
+    const collQual  = this.$('settCollisionQuality');
     if (sfx)       sfx.checked       = settings.sfx;
     if (music)     music.checked     = settings.music;
     if (particles) particles.checked = settings.particles;
     if (shake)     shake.checked     = settings.shake;
     if (ship)      ship.value        = settings.shipStyle;
+    if (collQual)  collQual.value    = settings.collisionQuality || 'auto';
 
     const reflectSlider = (id, value) => {
       const el = this.$(id);
@@ -189,14 +194,21 @@ export class UIManager {
     for (const it of items) {
       if (it.time <= 0) continue;
       const pct = Math.max(0, Math.min(100, (it.time / it.max) * 100));
+      const secs = (it.time / 1000).toFixed(1) + 's';
       const el = document.createElement('div');
       el.className = 'pu-indicator';
       el.innerHTML = `
         <span class="pu-emoji">${it.emoji}</span>
         <div class="pu-timer"><div class="pu-timer-fill" style="width:${pct}%;background:${it.color}"></div></div>
+        <span class="pu-seconds">${secs}</span>
       `;
       bar.appendChild(el);
     }
+  }
+
+  setCollisionDegradation(active) {
+    const el = this.$('collisionDegradation');
+    if (el) el.style.display = active ? 'flex' : 'none';
   }
 
   // ====== High score display ======
